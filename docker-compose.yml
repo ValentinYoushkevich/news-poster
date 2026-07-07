@@ -1,3 +1,8 @@
+# Единый стек news-poster: БД + бэкенд + фронт-админка + n8n + rsshub + ollama.
+# name: n8n-stack — чтобы тома n8n_data/ollama_data подхватились ТЕ ЖЕ, что уже есть
+# (n8n-stack_n8n_data / n8n-stack_ollama_data) и данные n8n/модели не потерялись.
+name: n8n-stack
+
 services:
   db:
     image: postgres:16
@@ -5,9 +10,73 @@ services:
       POSTGRES_USER: newsposter
       POSTGRES_PASSWORD: newsposter
       POSTGRES_DB: newsposter
-    ports:
-      - "5436:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U newsposter"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://newsposter:newsposter@db:5432/newsposter?schema=public
+      PORT: "3000"
+      OLLAMA_URL: http://ollama:11434
+      EMBED_MODEL: bge-m3
+      OPENROUTER_URL: https://openrouter.ai/api/v1/chat/completions
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      REWRITE_MODEL: ${REWRITE_MODEL:-openai/gpt-4o-mini}
+      BOT_TOKEN: ${BOT_TOKEN}
+      SERVICE_CHAT_ID: ${SERVICE_CHAT_ID}
+      PREVIEW_TTL_DEFAULT: ${PREVIEW_TTL_DEFAULT:-1440}
+      DEDUP_THRESHOLD: ${DEDUP_THRESHOLD:-0.85}
+      DEDUP_WINDOW_HOURS: ${DEDUP_WINDOW_HOURS:-24}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      # host 3001 (:3000 занят чужим стеком astro-poster); внутри сети — backend:3000
+      - "3001:3000"
+    restart: unless-stopped
+
+  web:
+    build: ./web
+    depends_on:
+      - backend
+    ports:
+      # host 8081 (:8080 занят astro-poster-web); контейнер слушает 80
+      - "8081:80"
+    restart: unless-stopped
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - GENERIC_TIMEZONE=Europe/Moscow
+    volumes:
+      - n8n_data:/home/node/.n8n
+    restart: unless-stopped
+
+  rsshub:
+    image: diygod/rsshub
+    ports:
+      - "1200:1200"
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
 volumes:
   pgdata:
+  n8n_data: # -> n8n-stack_n8n_data (существующий, данные n8n сохраняются)
+  ollama_data: # -> n8n-stack_ollama_data (существующий, модели сохраняются)

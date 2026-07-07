@@ -5,15 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "start": "node dist/server.js",
+    "serve": "node dist/server.js",
     "build": "tsc",
     "test": "vitest run",
     "test:watch": "vitest",
     "prisma:migrate": "prisma migrate dev",
     "prisma:generate": "prisma generate",
-    "n8n": "docker compose -f n8n-compose.yml up -d",
-    "n8n:stop": "docker compose -f n8n-compose.yml down",
-    "n8n:logs": "docker compose -f n8n-compose.yml logs -f"
+    "start": "docker compose up --build -d",
+    "stop": "docker compose down",
+    "logs": "docker compose logs -f"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

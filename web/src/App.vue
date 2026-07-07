@@ -1,0 +1,15 @@
+<script setup lang="ts">
+import Toast from 'primevue/toast'
+</script>
+
+<template>
+  <div class="min-h-screen bg-surface-50 text-surface-900">
+    <header class="border-b border-surface-200 px-6 py-3">
+      <h1 class="text-lg font-semibold">news-poster · админка</h1>
+    </header>
+    <main class="p-6">
+      <router-view />
+    </main>
+    <Toast />
+  </div>
+</template>
