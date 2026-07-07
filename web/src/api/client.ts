@@ -76,4 +76,6 @@ export const api = {
     request<Post>(`/posts/${id}`, { method: 'DELETE', body: JSON.stringify({ rejectReason }) }),
   rewrite: (id: string) =>
     request<{ accepted: boolean }>(`/posts/${id}/rewrite`, { method: 'POST' }),
+  classify: (id: string) =>
+    request<{ accepted: boolean }>(`/posts/${id}/classify`, { method: 'POST' }),
 }

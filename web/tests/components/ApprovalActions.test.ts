@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest'
 import ApprovalActions from '../../src/components/ApprovalActions.vue'
 import type { Post } from '../../src/api/types'
 
-function w(status: Post['status']) {
-  return mount(ApprovalActions, { props: { status } })
+function w(status: Post['status'], bucket: string | null = 'сво') {
+  return mount(ApprovalActions, { props: { status, bucket } })
 }
 
 describe('ApprovalActions', () => {
@@ -20,22 +20,42 @@ describe('ApprovalActions', () => {
     expect(c.find('[data-test="approve"]').exists()).toBe(false)
   })
 
-  it('pending: доступны и rewrite, и delete', () => {
+  it('pending с бакетом: доступны rewrite и delete, но не classify', () => {
     const c = w('pending')
     expect(c.find('[data-test="rewrite"]').exists()).toBe(true)
     expect(c.find('[data-test="delete"]').exists()).toBe(true)
+    expect(c.find('[data-test="classify"]').exists()).toBe(false)
   })
 
-  it('failed: доступен rewrite, но не delete', () => {
+  it('pending без бакета: доступен classify, но не rewrite', () => {
+    const c = w('pending', null)
+    expect(c.find('[data-test="classify"]').exists()).toBe(true)
+    expect(c.find('[data-test="rewrite"]').exists()).toBe(false)
+  })
+
+  it('failed с бакетом: доступен rewrite, но не delete и не classify', () => {
     const c = w('failed')
     expect(c.find('[data-test="rewrite"]').exists()).toBe(true)
+    expect(c.find('[data-test="classify"]').exists()).toBe(false)
     expect(c.find('[data-test="delete"]').exists()).toBe(false)
   })
 
-  it('ready_to_publish: доступен delete, но не rewrite', () => {
+  it('failed без бакета: доступен classify, но не rewrite', () => {
+    const c = w('failed', null)
+    expect(c.find('[data-test="classify"]').exists()).toBe(true)
+    expect(c.find('[data-test="rewrite"]').exists()).toBe(false)
+  })
+
+  it('ready_to_publish: доступен delete, но не rewrite и не classify', () => {
     const c = w('ready_to_publish')
     expect(c.find('[data-test="delete"]').exists()).toBe(true)
     expect(c.find('[data-test="rewrite"]').exists()).toBe(false)
+    expect(c.find('[data-test="classify"]').exists()).toBe(false)
+  })
+
+  it('ready_to_publish без бакета: classify всё равно недоступен', () => {
+    const c = w('ready_to_publish', null)
+    expect(c.find('[data-test="classify"]').exists()).toBe(false)
   })
 
   it('processing: доступен delete, но не rewrite', () => {
@@ -62,5 +82,11 @@ describe('ApprovalActions', () => {
     expect(c.emitted('approve')).toBeTruthy()
     expect(c.emitted('rewrite')).toBeTruthy()
     expect(c.emitted('delete')).toBeTruthy()
+  })
+
+  it('эмитит classify без бакета', async () => {
+    const c = w('pending', null)
+    await c.get('[data-test="classify"]').trigger('click')
+    expect(c.emitted('classify')).toBeTruthy()
   })
 })

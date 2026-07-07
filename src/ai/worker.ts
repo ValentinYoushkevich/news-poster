@@ -35,11 +35,11 @@ async function failSafely(postId: bigint, msg: string): Promise<void> {
     .catch(() => undefined)
 }
 
+// Автоматическая часть пайплайна: только эмбеддинг и смысловой дедуп.
+// Классификация и рерайт вынесены в отдельные шаги по запросу человека
+// (classifyPost / reRewritePost).
 export async function processPost(postId: bigint, deps: WorkerDeps): Promise<void> {
-  const post = await prisma.post.findUnique({
-    where: { id: postId },
-    include: { channel: true },
-  })
+  const post = await prisma.post.findUnique({ where: { id: postId } })
   if (!post) return
 
   try {
@@ -72,7 +72,30 @@ export async function processPost(postId: bigint, deps: WorkerDeps): Promise<voi
       return
     }
 
-    // 3. Классификация бакета из конфига канала
+    // 3. Не дубль — карточка уходит в pending и ждёт решения человека:
+    // классификация (POST /posts/:id/classify) и рерайт (POST /posts/:id/rewrite)
+    // запускаются только по явному запросу оператора. bucket и rewrite-поля
+    // остаются null, deps.llm здесь не вызывается.
+    await transition(postId, 'processing', 'pending')
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    await failSafely(postId, msg)
+  }
+}
+
+// Классификация бакета по запросу человека. Разрешена только из pending/failed
+// (та же карта переходов, что и у рерайта). Рерайт НЕ запускается — оператор
+// проверяет бакет и запускает его отдельно.
+export async function classifyPost(postId: bigint, deps: WorkerDeps): Promise<void> {
+  const post = await prisma.post.findUnique({
+    where: { id: postId },
+    include: { channel: true },
+  })
+  if (!post) return
+  try {
+    // Гонки не перетираем: если статус сменился после проверки в роуте,
+    // updateMany не пройдёт (или assertTransition бросит) — выходим молча.
+    if (!(await transition(postId, post.status, 'processing', { aiError: null }))) return
     const buckets = (post.channel.buckets as string[]) ?? []
     const rawBucket = await deps.llm.classify({
       text: `${post.origTitle}\n${post.origText}`,
@@ -80,24 +103,7 @@ export async function processPost(postId: bigint, deps: WorkerDeps): Promise<voi
     })
     const bucket = pickBucket(rawBucket, buckets)
     if (!bucket) throw new Error(`classify_unknown_bucket:${rawBucket}`)
-    await prisma.post.updateMany({ where: { id: postId }, data: { bucket } })
-
-    // 4+5. Рерайт+перевод одним промптом (per-bucket шаблон, спец-путь сво)
-    const prompts = (post.channel.rewritePrompts as Record<string, string>) ?? {}
-    const rr = await deps.llm.rewrite({
-      origTitle: post.origTitle,
-      origText: post.origText,
-      sourceLang: post.sourceLang,
-      bucket,
-      isSvo: bucket === 'сво',
-      promptTemplate: prompts[bucket] ?? null,
-    })
-    await transition(postId, 'processing', 'pending', {
-      rewrittenTitle: rr.title,
-      rewrittenText: rr.text,
-      finalTitle: rr.title,
-      finalText: rr.text,
-    })
+    await transition(postId, 'processing', 'pending', { bucket })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     await failSafely(postId, msg)
@@ -116,11 +122,10 @@ export async function reRewritePost(postId: bigint, deps: WorkerDeps): Promise<v
     // не «воскрешаются», даже если карточка успела сменить статус после
     // проверки в роуте (assertTransition бросит, catch ничего не перетрёт).
     if (!(await transition(postId, post.status, 'processing', { aiError: null }))) return
-    const buckets = (post.channel.buckets as string[]) ?? []
-    const bucket = post.bucket ?? pickBucket(
-      await deps.llm.classify({ text: `${post.origTitle}\n${post.origText}`, buckets }),
-      buckets,
-    )
+    // Рерайт возможен только при уже выставленном бакете (человеком или через
+    // classifyPost) — авто-классификации здесь больше нет. Роут отсекает такие
+    // карточки раньше (409 rewrite_no_bucket), это подстраховка от гонок.
+    const bucket = post.bucket
     if (!bucket) throw new Error('rewrite_no_bucket')
     const prompts = (post.channel.rewritePrompts as Record<string, string>) ?? {}
     const rr = await deps.llm.rewrite({

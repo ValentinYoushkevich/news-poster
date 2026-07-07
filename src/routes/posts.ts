@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import { triggerAiProcessing, triggerRewrite } from '../ai/trigger.js'
+import { triggerAiProcessing, triggerClassify, triggerRewrite } from '../ai/trigger.js'
 import { AppError, asyncHandler } from '../errors.js'
 import {
   addImage,
@@ -164,7 +164,27 @@ postsRouter.post(
     if (post.status !== 'pending' && post.status !== 'failed') {
       throw new AppError(409, 'invalid_transition')
     }
+    // Рерайт только при выставленном бакете (руками через PATCH или через
+    // /classify) — без него нечего подставлять в per-bucket промпт.
+    if (post.bucket == null) {
+      throw new AppError(409, 'rewrite_no_bucket')
+    }
     void triggerRewrite(id)
+    res.status(202).json({ accepted: true })
+  }),
+)
+
+postsRouter.post(
+  '/:id/classify',
+  asyncHandler(async (req, res) => {
+    const id = BigInt(String(req.params.id)) // Express 5: params.id имеет тип string | string[]
+    const post = await getPost(id) // 404, если нет
+    // Классификация по запросу человека разрешена только из pending/failed —
+    // та же логика, что и у рерайта (см. карту src/status.ts).
+    if (post.status !== 'pending' && post.status !== 'failed') {
+      throw new AppError(409, 'invalid_transition')
+    }
+    void triggerClassify(id)
     res.status(202).json({ accepted: true })
   }),
 )

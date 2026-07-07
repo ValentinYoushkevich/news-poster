@@ -62,6 +62,22 @@ describe('api client', () => {
     expect(JSON.parse((init as RequestInit).body as string)).toEqual(body)
   })
 
+  it('classify шлёт POST на /api/posts/:id/classify', async () => {
+    const fetchMock = mockFetch({ accepted: true })
+    await api.classify('42')
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toContain('/api/posts/42/classify')
+    expect((init as RequestInit).method).toBe('POST')
+  })
+
+  it('rewrite шлёт POST на /api/posts/:id/rewrite', async () => {
+    const fetchMock = mockFetch({ accepted: true })
+    await api.rewrite('42')
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toContain('/api/posts/42/rewrite')
+    expect((init as RequestInit).method).toBe('POST')
+  })
+
   it('не-ok ответ бросает ApiError с code', async () => {
     mockFetch({ error: 'invalid_transition', code: 'invalid_transition' }, false, 409)
     await expect(api.approve('1')).rejects.toMatchObject({

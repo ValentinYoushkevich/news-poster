@@ -66,9 +66,11 @@ async function run(action: () => Promise<unknown>, okMsg: string) {
 
       <ApprovalActions
         :status="posts.current.status"
+        :bucket="posts.current.bucket"
         @approve="run(() => posts.approveCurrent(), 'Заапрувлено — превью в служебке')"
         @unapprove="run(() => posts.unapproveCurrent(), 'Аппрув отменён')"
-        @rewrite="run(() => posts.rewriteCurrent(), 'Рерайт запущен')"
+        @classify="run(() => posts.classifyCurrent(), 'Отправлено на классификацию')"
+        @rewrite="run(() => posts.rewriteCurrent(), 'Отправлено на рерайт')"
         @delete="run(async () => { const ch = posts.current?.channelId; await posts.removeCurrent(); router.push(`/channels/${ch}`) }, 'Удалено')"
       />
     </div>

@@ -8,6 +8,7 @@ vi.mock('../../src/api/client', () => ({
     listPosts: vi.fn(),
     getPost: vi.fn(),
     approve: vi.fn(),
+    classify: vi.fn(),
   },
   ApiError: class extends Error {},
 }))
@@ -42,5 +43,14 @@ describe('posts store', () => {
     await store.loadPost('5')
     await store.approveCurrent()
     expect(store.current?.status).toBe('ready_to_publish')
+  })
+
+  it('classifyCurrent зовёт api.classify с id текущего поста', async () => {
+    ;(api.getPost as any).mockResolvedValue({ id: '5', status: 'pending', bucket: null })
+    ;(api.classify as any).mockResolvedValue({ accepted: true })
+    const store = usePostsStore()
+    await store.loadPost('5')
+    await store.classifyCurrent()
+    expect(api.classify).toHaveBeenCalledWith('5')
   })
 })

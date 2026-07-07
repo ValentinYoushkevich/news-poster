@@ -68,6 +68,11 @@ export const usePostsStore = defineStore('posts', () => {
     await api.rewrite(current.value.id)
   }
 
+  async function classifyCurrent() {
+    if (!current.value) return
+    await api.classify(current.value.id)
+  }
+
   return {
     filters,
     list,
@@ -83,5 +88,6 @@ export const usePostsStore = defineStore('posts', () => {
     unapproveCurrent,
     removeCurrent,
     rewriteCurrent,
+    classifyCurrent,
   }
 })

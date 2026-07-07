@@ -1,7 +1,7 @@
 import { defaultDeps } from './providers/default.js'
 import type { WorkerDeps } from './providers/types.js'
 import { enqueue } from './queue.js'
-import { processPost, reRewritePost } from './worker.js'
+import { classifyPost, processPost, reRewritePost } from './worker.js'
 
 // Под тест-раннером фоновая обработка отключается: ingest-роут по-прежнему
 // вызывает настоящий триггер, но его fire-and-forget сторона (постановка в
@@ -20,4 +20,9 @@ export function triggerAiProcessing(postId: bigint, deps: WorkerDeps = defaultDe
 export function triggerRewrite(postId: bigint, deps: WorkerDeps = defaultDeps()): Promise<unknown> {
   if (AI_TRIGGER_DISABLED) return Promise.resolve()
   return enqueue(() => reRewritePost(postId, deps))
+}
+
+export function triggerClassify(postId: bigint, deps: WorkerDeps = defaultDeps()): Promise<unknown> {
+  if (AI_TRIGGER_DISABLED) return Promise.resolve()
+  return enqueue(() => classifyPost(postId, deps))
 }
