@@ -37,15 +37,18 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      # host 3001 (:3000 занят чужим стеком astro-poster); внутри сети — backend:3000
-      - "3001:3000"
+    # Порт наружу НЕ публикуем: API доступен с хоста только через админку (nginx /api, под логином),
+    # а для n8n — по внутренней сети как http://backend:3000. Так админ-логин реально защищает API.
     restart: unless-stopped
 
   web:
     build: ./web
     depends_on:
       - backend
+    environment:
+      # Логин/пароль админки (Basic Auth в nginx). Значения — в корневом .env.
+      ADMIN_LOGIN: ${ADMIN_LOGIN}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
     ports:
       # host 8081 (:8080 занят astro-poster-web); контейнер слушает 80
       - "8081:80"

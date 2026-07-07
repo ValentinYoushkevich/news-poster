@@ -1,6 +1,9 @@
 # --- backend (Express + Prisma) ---
 FROM node:22-slim AS build
 WORKDIR /app
+# openssl нужен prisma generate, чтобы правильно определить движок (debian-openssl-3.0.x)
+RUN apt-get update && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/*
 COPY package*.json ./
 RUN npm ci
 COPY prisma ./prisma

@@ -45,7 +45,12 @@ async function run(action: () => Promise<unknown>, okMsg: string) {
 <template>
   <div v-if="posts.current" class="grid grid-cols-1 gap-6 lg:grid-cols-2">
     <div class="flex flex-col gap-4">
-      <button class="self-start text-sm text-primary-600" @click="router.push('/')">← к списку</button>
+      <button
+        class="self-start text-sm text-primary-400"
+        @click="router.push(`/channels/${posts.current.channelId}`)"
+      >
+        ← к постам канала
+      </button>
 
       <PostEditor
         :post="posts.current"
@@ -64,11 +69,11 @@ async function run(action: () => Promise<unknown>, okMsg: string) {
         @approve="run(() => posts.approveCurrent(), 'Заапрувлено — превью в служебке')"
         @unapprove="run(() => posts.unapproveCurrent(), 'Аппрув отменён')"
         @rewrite="run(() => posts.rewriteCurrent(), 'Рерайт запущен')"
-        @delete="run(async () => { await posts.removeCurrent(); router.push('/') }, 'Удалено')"
+        @delete="run(async () => { const ch = posts.current?.channelId; await posts.removeCurrent(); router.push(`/channels/${ch}`) }, 'Удалено')"
       />
     </div>
 
     <PreviewPane :post="posts.current" />
   </div>
-  <p v-else class="text-surface-500">Загрузка…</p>
+  <p v-else class="text-surface-400">Загрузка…</p>
 </template>

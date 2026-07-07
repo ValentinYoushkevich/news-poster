@@ -1,4 +1,4 @@
-import '../src/bigint.js'
+import './bigint.js'
 import express from 'express'
 import { errorHandler } from './middleware/errorHandler.js'
 import { channelsRouter } from './routes/channels.js'

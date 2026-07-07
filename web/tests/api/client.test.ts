@@ -43,6 +43,22 @@ describe('api client', () => {
     expect(JSON.parse((init as RequestInit).body as string)).toEqual({ url: null })
   })
 
+  it('createChannel шлёт POST на /api/channels с телом', async () => {
+    const fetchMock = mockFetch({ id: 'c1' })
+    const body = {
+      name: 'Новости',
+      mainChatId: '-100',
+      buckets: ['x'],
+      rewritePrompts: {},
+      schedule: '*/30 * * * *',
+    }
+    await api.createChannel(body)
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toContain('/api/channels')
+    expect((init as RequestInit).method).toBe('POST')
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual(body)
+  })
+
   it('не-ok ответ бросает ApiError с code', async () => {
     mockFetch({ error: 'invalid_transition', code: 'invalid_transition' }, false, 409)
     await expect(api.approve('1')).rejects.toMatchObject({

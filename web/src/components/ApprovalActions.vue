@@ -23,7 +23,7 @@ const emit = defineEmits<{ approve: []; unapprove: []; delete: []; rewrite: [] }
     >
       Отменить аппрув
     </button>
-    <button data-test="rewrite" class="rounded border px-3 py-1" @click="emit('rewrite')">
+    <button data-test="rewrite" class="rounded border border-surface-700 px-3 py-1 hover:bg-surface-800" @click="emit('rewrite')">
       Пере-рерайт
     </button>
     <button data-test="delete" class="rounded bg-red-600 px-3 py-1 text-white" @click="emit('delete')">

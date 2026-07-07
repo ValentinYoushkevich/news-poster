@@ -8,7 +8,7 @@ const emit = defineEmits<{ open: [string] }>()
 <template>
   <table class="w-full border-collapse text-sm">
     <thead>
-      <tr class="border-b text-left">
+      <tr class="border-b border-surface-700 text-left">
         <th class="p-2">Заголовок</th>
         <th class="p-2">Статус</th>
         <th class="p-2">Бакет</th>
@@ -21,7 +21,7 @@ const emit = defineEmits<{ open: [string] }>()
         v-for="p in posts"
         :key="p.id"
         :data-test="`row-${p.id}`"
-        class="cursor-pointer border-b hover:bg-surface-100"
+        class="cursor-pointer border-b border-surface-800 hover:bg-surface-800"
         @click="emit('open', p.id)"
       >
         <td class="p-2">{{ p.finalTitle || p.origTitle }}</td>

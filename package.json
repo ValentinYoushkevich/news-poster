@@ -11,7 +11,7 @@
     "test:watch": "vitest",
     "prisma:migrate": "prisma migrate dev",
     "prisma:generate": "prisma generate",
-    "start": "docker compose up --build -d",
+    "start": "node scripts/start.mjs",
     "stop": "docker compose down",
     "logs": "docker compose logs -f"
   },

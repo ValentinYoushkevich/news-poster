@@ -50,8 +50,21 @@ export interface Channel {
   name: string
   mainChatId: string
   buckets: string[]
+  rewritePrompts: Record<string, string>
   schedule: string
+  previewTtl: number | null
   active: boolean
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface ChannelCreate {
+  name: string
+  mainChatId: string
+  buckets: string[]
+  rewritePrompts: Record<string, string>
+  schedule: string
+  previewTtl?: number | null
 }
 
 export interface PostList {

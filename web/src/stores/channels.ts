@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { api } from '../api/client'
-import type { Channel } from '../api/types'
+import type { Channel, ChannelCreate } from '../api/types'
 
 export const useChannelsStore = defineStore('channels', () => {
   const channels = ref<Channel[]>([])
@@ -16,5 +16,11 @@ export const useChannelsStore = defineStore('channels', () => {
     }
   }
 
-  return { channels, loading, loadChannels }
+  async function createChannel(body: ChannelCreate) {
+    const created = await api.createChannel(body)
+    channels.value.push(created)
+    return created
+  }
+
+  return { channels, loading, loadChannels, createChannel }
 })

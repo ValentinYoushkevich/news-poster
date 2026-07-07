@@ -1,4 +1,4 @@
-import type { Channel, ListFilters, Post, PostList } from './types'
+import type { Channel, ChannelCreate, ListFilters, Post, PostList } from './types'
 
 const BASE = '/api'
 
@@ -39,6 +39,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   listChannels: () => request<Channel[]>('/channels'),
+  createChannel: (body: ChannelCreate) =>
+    request<Channel>('/channels', { method: 'POST', body: JSON.stringify(body) }),
   listPosts: (f: ListFilters) => request<PostList>(`/posts?${qs(f)}`),
   getPost: (id: string) => request<Post>(`/posts/${id}`),
   patchPost: (id: string, body: { finalTitle?: string; finalText?: string; bucket?: string }) =>

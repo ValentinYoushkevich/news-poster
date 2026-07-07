@@ -16,14 +16,14 @@ function add() {
 
 <template>
   <div class="flex flex-col gap-2">
-    <div v-if="!images.length" class="text-sm text-surface-500">Картинок нет — пост текстовый.</div>
+    <div v-if="!images.length" class="text-sm text-surface-400">Картинок нет — пост текстовый.</div>
 
     <div class="flex flex-wrap gap-3">
       <figure
         v-for="img in images"
         :key="img.url"
         class="w-40 rounded border p-1"
-        :class="img.chosen ? 'border-primary-500 ring-2 ring-primary-300' : 'border-surface-200'"
+        :class="img.chosen ? 'border-primary-500 ring-2 ring-primary-300' : 'border-surface-700'"
       >
         <img :src="img.url" :alt="img.origin" class="h-24 w-full object-cover" />
         <figcaption class="mt-1 flex items-center justify-between text-xs">
@@ -45,13 +45,13 @@ function add() {
         data-test="img-url"
         v-model="newUrl"
         placeholder="URL картинки"
-        class="flex-1 rounded border px-2 py-1 text-sm"
+        class="flex-1 rounded border border-surface-700 bg-surface-900 px-2 py-1 text-sm text-surface-0"
       />
-      <button data-test="img-add" class="rounded border px-3 py-1 text-sm" @click="add">Добавить</button>
+      <button data-test="img-add" class="rounded border border-surface-700 px-3 py-1 text-sm hover:bg-surface-800" @click="add">Добавить</button>
       <button
         v-if="images.some((i) => i.chosen)"
         data-test="clear"
-        class="rounded border px-3 py-1 text-sm"
+        class="rounded border border-surface-700 px-3 py-1 text-sm hover:bg-surface-800"
         @click="emit('select', null)"
       >
         Убрать картинку

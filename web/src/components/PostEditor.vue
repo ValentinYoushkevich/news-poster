@@ -25,21 +25,21 @@ watch(
   <div class="flex flex-col gap-3">
     <label class="flex flex-col text-sm">
       <span>Заголовок</span>
-      <input data-test="finalTitle" v-model="form.finalTitle" class="rounded border px-2 py-1" />
+      <input data-test="finalTitle" v-model="form.finalTitle" class="rounded border border-surface-700 bg-surface-900 px-2 py-1 text-surface-0" />
     </label>
     <label class="flex flex-col text-sm">
       <span>Текст</span>
-      <textarea data-test="finalText" v-model="form.finalText" rows="8" class="rounded border px-2 py-1" />
+      <textarea data-test="finalText" v-model="form.finalText" rows="8" class="rounded border border-surface-700 bg-surface-900 px-2 py-1 text-surface-0" />
     </label>
     <label class="flex flex-col text-sm">
       <span>Бакет</span>
-      <select data-test="bucket" v-model="form.bucket" class="rounded border px-2 py-1">
+      <select data-test="bucket" v-model="form.bucket" class="rounded border border-surface-700 bg-surface-900 px-2 py-1 text-surface-0">
         <option value="">— не задан —</option>
         <option v-for="b in buckets" :key="b" :value="b">{{ b }}</option>
       </select>
     </label>
 
-    <details class="text-sm text-surface-500">
+    <details class="text-sm text-surface-400">
       <summary>Оригинал</summary>
       <p class="font-medium">{{ post.origTitle }}</p>
       <p class="whitespace-pre-wrap">{{ post.origText }}</p>

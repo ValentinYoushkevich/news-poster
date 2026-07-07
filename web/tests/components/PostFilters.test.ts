@@ -4,11 +4,20 @@ import PostFilters from '../../src/components/PostFilters.vue'
 import type { Channel, ListFilters } from '../../src/api/types'
 
 const channels: Channel[] = [
-  { id: '1', name: 'Новости', mainChatId: '-1', buckets: ['рф-внутр', 'сво'], schedule: 'x', active: true },
+  {
+    id: '1',
+    name: 'Новости',
+    mainChatId: '-1',
+    buckets: ['рф-внутр', 'сво'],
+    rewritePrompts: {},
+    schedule: 'x',
+    previewTtl: null,
+    active: true,
+  },
 ]
 
-function factory(filters: ListFilters = { page: 1 }) {
-  return mount(PostFilters, { props: { modelValue: filters, channels } })
+function factory(filters: ListFilters = { page: 1 }, hideChannel = false) {
+  return mount(PostFilters, { props: { modelValue: filters, channels, hideChannel } })
 }
 
 describe('PostFilters', () => {
@@ -21,6 +30,11 @@ describe('PostFilters', () => {
     const w = factory()
     await w.get('[data-test="apply"]').trigger('click')
     expect(w.emitted('apply')).toBeTruthy()
+  })
+
+  it('скрывает селектор канала при hideChannel', () => {
+    const w = factory({ page: 1 }, true)
+    expect(w.find('[data-test="channel"]').exists()).toBe(false)
   })
 
   it('меняет статус и эмитит update:modelValue', async () => {
