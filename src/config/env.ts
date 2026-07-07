@@ -5,6 +5,9 @@ const schema = z.object({
   PORT: z.coerce.number().default(3000),
   PREVIEW_TTL_DEFAULT: z.coerce.number().default(1440),
 
+  BOT_TOKEN: z.string().default(''),
+  SERVICE_CHAT_ID: z.string().default(''),
+
   OLLAMA_URL: z.string().default('http://localhost:11434'),
   EMBED_MODEL: z.string().default('bge-m3'),
 

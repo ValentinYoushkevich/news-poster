@@ -1,7 +1,12 @@
 import { Prisma } from '@prisma/client'
+import { env } from '../config/env.js'
 import { prisma } from '../db/client.js'
 import { AppError } from '../errors.js'
-import { normalizeItem, type RawItem } from '../normalize/normalizeItem.js'
+import { type ImageCandidate, normalizeItem, type RawItem } from '../normalize/normalizeItem.js'
+import { assertTransition } from '../status.js'
+import { defaultTelegram } from '../telegram/default.js'
+import { buildCaption } from '../telegram/html.js'
+import type { TelegramClient } from '../telegram/types.js'
 
 export async function ingest(item: RawItem) {
   const card = normalizeItem(item)
@@ -79,4 +84,155 @@ export async function patchPost(
 ) {
   await getPost(id)
   return prisma.post.update({ where: { id }, data })
+}
+
+export async function addImage(
+  id: bigint,
+  input: { url: string; type?: string | null },
+) {
+  const post = await getPost(id)
+  const images = (post.images as unknown as ImageCandidate[]) ?? []
+  const hasChosen = images.some((i) => i.chosen)
+  const candidate: ImageCandidate = {
+    url: input.url,
+    type: input.type ?? null,
+    origin: 'uploaded',
+    fileId: null,
+    chosen: !hasChosen, // авто-выбор, если выбранной ещё нет
+  }
+  const next = [...images, candidate]
+  return prisma.post.update({
+    where: { id },
+    data: { images: next as unknown as Prisma.InputJsonValue },
+  })
+}
+
+export async function selectImage(id: bigint, url: string | null) {
+  const post = await getPost(id)
+  const images = (post.images as unknown as ImageCandidate[]) ?? []
+  if (url === null) {
+    const next = images.map((i) => ({ ...i, chosen: false }))
+    return prisma.post.update({
+      where: { id },
+      data: { images: next as unknown as Prisma.InputJsonValue },
+    })
+  }
+  if (!images.some((i) => i.url === url)) throw new AppError(404, 'image_not_found')
+  const next = images.map((i) => ({ ...i, chosen: i.url === url }))
+  return prisma.post.update({
+    where: { id },
+    data: { images: next as unknown as Prisma.InputJsonValue },
+  })
+}
+
+export async function approvePost(id: bigint, telegram: TelegramClient = defaultTelegram()) {
+  const post = await getPost(id)
+  assertTransition(post.status, 'ready_to_publish') // требует pending
+
+  const caption = buildCaption(post.finalTitle ?? '', post.finalText ?? '')
+  const images = (post.images as unknown as ImageCandidate[]) ?? []
+  const chosen = images.find((i) => i.chosen)
+
+  let previewMessageId: number
+  let nextImages = images
+
+  if (chosen) {
+    const sent = await telegram.sendPhoto({
+      chatId: env.SERVICE_CHAT_ID,
+      photo: chosen.fileId ?? chosen.url,
+      caption,
+    })
+    previewMessageId = sent.messageId
+    if (sent.fileId) {
+      nextImages = images.map((i) =>
+        i.url === chosen.url ? { ...i, fileId: sent.fileId ?? null } : i,
+      )
+    }
+  } else {
+    const sent = await telegram.sendMessage({
+      chatId: env.SERVICE_CHAT_ID,
+      text: caption,
+    })
+    previewMessageId = sent.messageId
+  }
+
+  return prisma.post.update({
+    where: { id },
+    data: {
+      images: nextImages as unknown as Prisma.InputJsonValue,
+      previewMessageId: BigInt(previewMessageId),
+      status: 'ready_to_publish',
+      approvedAt: new Date(),
+    },
+  })
+}
+
+export async function unapprovePost(id: bigint) {
+  const post = await getPost(id)
+  assertTransition(post.status, 'pending') // требует ready_to_publish
+  // Превью-сообщение в служебке НЕ удаляем — там TTL-автоудаление снаружи.
+  return prisma.post.update({ where: { id }, data: { status: 'pending' } })
+}
+
+export async function softDeletePost(id: bigint, rejectReason?: string) {
+  const post = await getPost(id)
+  assertTransition(post.status, 'rejected')
+  return prisma.post.update({
+    where: { id },
+    data: { status: 'rejected', rejectReason: rejectReason ?? null },
+  })
+}
+
+export interface QueueItem {
+  id: bigint
+  channelId: bigint
+  pubDate: Date
+  caption: string
+  fileId: string | null
+  mainChatId: string
+}
+
+const QUEUE_LIMIT_DEFAULT = 10
+
+// Готовая к постингу очередь канала: только ready_to_publish, старые первыми
+// (ровный тайминг). Возвращаем всё, что n8n нужно для sendPhoto/sendMessage,
+// одним запросом — сам сервис в Telegram не ходит.
+export async function listPublishQueue(filter: {
+  channelId: bigint
+  limit?: number
+}): Promise<QueueItem[]> {
+  const posts = await prisma.post.findMany({
+    where: { channelId: filter.channelId, status: 'ready_to_publish' },
+    orderBy: { pubDate: 'asc' },
+    take: filter.limit ?? QUEUE_LIMIT_DEFAULT,
+    include: { channel: true },
+  })
+
+  return posts.map((p) => {
+    const images = (p.images as unknown as ImageCandidate[]) ?? []
+    const chosen = Array.isArray(images) ? images.find((img) => img.chosen) : undefined
+    return {
+      id: p.id,
+      channelId: p.channelId,
+      pubDate: p.pubDate,
+      caption: buildCaption(p.finalTitle ?? '', p.finalText ?? ''),
+      fileId: chosen?.fileId ?? null,
+      mainChatId: p.channel.mainChatId,
+    }
+  })
+}
+
+// Callback публикующей джобы: перевод в published после успешного постинга n8n.
+// from берём из БД, переход валидирует общий assertTransition (409 invalid_transition).
+export async function markPublished(id: bigint, publishedMessageId: bigint) {
+  const post = await getPost(id) // 404, если нет
+  assertTransition(post.status, 'published')
+  return prisma.post.update({
+    where: { id },
+    data: {
+      status: 'published',
+      publishedMessageId,
+      publishedAt: new Date(),
+    },
+  })
 }

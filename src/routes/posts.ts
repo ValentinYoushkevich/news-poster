@@ -2,7 +2,19 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { triggerAiProcessing, triggerRewrite } from '../ai/trigger.js'
 import { asyncHandler } from '../errors.js'
-import { getPost, ingest, listPosts, patchPost } from '../services/postService.js'
+import {
+  addImage,
+  approvePost,
+  getPost,
+  ingest,
+  listPosts,
+  listPublishQueue,
+  markPublished,
+  patchPost,
+  selectImage,
+  softDeletePost,
+  unapprovePost,
+} from '../services/postService.js'
 
 export const postsRouter = Router()
 
@@ -52,6 +64,21 @@ postsRouter.get(
   }),
 )
 
+const queueSchema = z.object({
+  channelId: z.coerce.bigint(),
+  limit: z.coerce.number().int().min(1).max(100).default(10),
+})
+
+// ВАЖНО: '/queue' зарегистрирован ДО '/:id', иначе Express 5 отдаст '/queue'
+// в '/:id' и BigInt('queue') бросит.
+postsRouter.get(
+  '/queue',
+  asyncHandler(async (req, res) => {
+    const q = queueSchema.parse(req.query)
+    res.json(await listPublishQueue(q))
+  }),
+)
+
 postsRouter.get(
   '/:id',
   asyncHandler(async (req, res) => {
@@ -73,6 +100,59 @@ postsRouter.patch(
   }),
 )
 
+const addImageSchema = z.object({
+  url: z.string().min(1),
+  type: z.string().optional(),
+})
+
+postsRouter.post(
+  '/:id/images',
+  asyncHandler(async (req, res) => {
+    const dto = addImageSchema.parse(req.body)
+    const post = await addImage(BigInt(String(req.params.id)), dto)
+    res.status(201).json(post)
+  }),
+)
+
+const selectImageSchema = z.object({
+  url: z.string().min(1).nullable(),
+})
+
+postsRouter.patch(
+  '/:id/images/select',
+  asyncHandler(async (req, res) => {
+    const dto = selectImageSchema.parse(req.body)
+    res.json(await selectImage(BigInt(String(req.params.id)), dto.url))
+  }),
+)
+
+postsRouter.post(
+  '/:id/approve',
+  asyncHandler(async (req, res) => {
+    const post = await approvePost(BigInt(String(req.params.id)))
+    res.json(post)
+  }),
+)
+
+postsRouter.post(
+  '/:id/unapprove',
+  asyncHandler(async (req, res) => {
+    res.json(await unapprovePost(BigInt(String(req.params.id))))
+  }),
+)
+
+const deleteSchema = z.object({
+  rejectReason: z.string().optional(),
+})
+
+postsRouter.delete(
+  '/:id',
+  asyncHandler(async (req, res) => {
+    const dto = deleteSchema.parse(req.body ?? {})
+    res.json(await softDeletePost(BigInt(String(req.params.id)), dto.rejectReason))
+  }),
+)
+
 postsRouter.post(
   '/:id/rewrite',
   asyncHandler(async (req, res) => {
@@ -80,5 +160,18 @@ postsRouter.post(
     await getPost(id) // 404, если нет
     void triggerRewrite(id)
     res.status(202).json({ accepted: true })
+  }),
+)
+
+const publishedSchema = z.object({
+  publishedMessageId: z.coerce.bigint(),
+})
+
+postsRouter.patch(
+  '/:id/published',
+  asyncHandler(async (req, res) => {
+    const id = BigInt(String(req.params.id)) // Express 5: params.id имеет тип string | string[]
+    const dto = publishedSchema.parse(req.body)
+    res.json(await markPublished(id, dto.publishedMessageId))
   }),
 )
