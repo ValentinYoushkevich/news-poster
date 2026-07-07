@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Channel {
+  id             BigInt   @id @default(autoincrement())
+  name           String
+  mainChatId     String
+  buckets        Json
+  rewritePrompts Json
+  schedule       String
+  previewTtl     Int?
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  posts          Post[]
+
+  @@map("channels")
+}
+
+model Post {
+  id                 BigInt    @id @default(autoincrement())
+  channelId          BigInt
+  channel            Channel   @relation(fields: [channelId], references: [id])
+  source             String
+  sourceLang         String
+  link               String
+  guid               String?
+  origTitle          String
+  origText           String
+  author             String?
+  categories         Json
+  pubDate            DateTime
+  images             Json
+  bucket             String?
+  embedding          Json?
+  rewrittenTitle     String?
+  rewrittenText      String?
+  finalTitle         String?
+  finalText          String?
+  status             String    @default("ingested")
+  previewMessageId   BigInt?
+  publishedMessageId BigInt?
+  aiError            String?
+  rejectReason       String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  approvedAt         DateTime?
+  publishedAt        DateTime?
+
+  @@unique([channelId, link])
+  @@index([channelId, status, pubDate])
+  @@index([channelId, bucket])
+  @@index([pubDate])
+  @@map("posts")
+}
