@@ -38,7 +38,7 @@ const canRewrite = computed(() => AI_ACTIONABLE.has(props.status) && !!props.buc
     <button
       v-if="canClassify"
       data-test="classify"
-      class="rounded border border-surface-700 px-3 py-1 hover:bg-surface-800"
+      class="rounded px-3 py-1 hover:bg-surface-800"
       @click="emit('classify')"
     >
       Классифицировать
@@ -46,7 +46,7 @@ const canRewrite = computed(() => AI_ACTIONABLE.has(props.status) && !!props.buc
     <button
       v-if="canRewrite"
       data-test="rewrite"
-      class="rounded border border-surface-700 px-3 py-1 hover:bg-surface-800"
+      class="rounded px-3 py-1 hover:bg-surface-800"
       @click="emit('rewrite')"
     >
       На рерайт

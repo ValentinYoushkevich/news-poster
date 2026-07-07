@@ -182,6 +182,13 @@ export async function unapprovePost(id: bigint) {
   return prisma.post.update({ where: { id }, data: { status: 'pending' }, omit: { embedding: true } })
 }
 
+// Жёсткое удаление из БД (кнопка-корзина в админке): без статусных ограничений,
+// карточка исчезает безвозвратно — в отличие от softDeletePost (rejected).
+export async function hardDeletePost(id: bigint): Promise<void> {
+  await getPost(id) // 404, если карточки нет
+  await prisma.post.delete({ where: { id } })
+}
+
 export async function softDeletePost(id: bigint, rejectReason?: string) {
   const post = await getPost(id)
   assertTransition(post.status, 'rejected')

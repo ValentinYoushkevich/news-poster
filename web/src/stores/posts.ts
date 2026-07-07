@@ -63,6 +63,14 @@ export const usePostsStore = defineStore('posts', () => {
     setCurrent(await api.remove(current.value.id, rejectReason))
   }
 
+  // Безвозвратное удаление из БД (любой статус) + чистка локального списка.
+  async function hardDelete(id: string) {
+    await api.hardDelete(id)
+    list.value.items = list.value.items.filter((p) => p.id !== id)
+    list.value.total = Math.max(0, list.value.total - 1)
+    if (current.value?.id === id) current.value = null
+  }
+
   async function rewriteCurrent() {
     if (!current.value) return
     await api.rewrite(current.value.id)
@@ -87,6 +95,7 @@ export const usePostsStore = defineStore('posts', () => {
     approveCurrent,
     unapproveCurrent,
     removeCurrent,
+    hardDelete,
     rewriteCurrent,
     classifyCurrent,
   }

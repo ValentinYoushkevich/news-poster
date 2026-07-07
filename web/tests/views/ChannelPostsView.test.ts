@@ -35,12 +35,15 @@ vi.mock('../../src/api/client', () => ({
       page: 1,
       pageSize: 20,
     }),
+    hardDelete: vi.fn().mockResolvedValue(undefined),
   },
   ApiError: class extends Error {},
 }))
 
 const push = vi.fn()
 vi.mock('vue-router', () => ({ useRouter: () => ({ push }) }))
+const toastAdd = vi.fn()
+vi.mock('primevue/usetoast', () => ({ useToast: () => ({ add: toastAdd }) }))
 
 beforeEach(() => {
   setActivePinia(createPinia())
@@ -72,6 +75,27 @@ describe('ChannelPostsView', () => {
     await w.vm.$nextTick()
     await w.get('[data-test="row-1"]').trigger('click')
     expect(push).toHaveBeenCalledWith('/posts/1')
+  })
+
+  it('корзина в таблице: confirm → hardDelete, тост «Карточка удалена», без перехода', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const w = mount(ChannelPostsView, { props: { channelId: 'c1' } })
+    await new Promise((r) => setTimeout(r, 0))
+    await w.vm.$nextTick()
+
+    await w.get('[data-test="hard-delete-1"]').trigger('click')
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(confirm).toHaveBeenCalledWith('Удалить карточку из базы безвозвратно?')
+    expect(api.hardDelete).toHaveBeenCalledWith('1')
+    expect(toastAdd).toHaveBeenCalledWith(
+      expect.objectContaining({ severity: 'success', summary: 'Карточка удалена' }),
+    )
+    expect(push).not.toHaveBeenCalled()
+
+    const posts = usePostsStore()
+    expect(posts.list.items).toHaveLength(0)
+    confirm.mockRestore()
   })
 
   it('при входе сбрасывает фильтры другого канала к дефолту', async () => {

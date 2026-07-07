@@ -6,6 +6,7 @@ import {
   addImage,
   approvePost,
   getPost,
+  hardDeletePost,
   ingest,
   listPosts,
   listPublishQueue,
@@ -138,6 +139,15 @@ postsRouter.post(
   '/:id/unapprove',
   asyncHandler(async (req, res) => {
     res.json(await unapprovePost(BigInt(String(req.params.id))))
+  }),
+)
+
+// Жёсткое удаление (корзина): карточка стирается из БД безвозвратно, любой статус.
+postsRouter.delete(
+  '/:id/hard',
+  asyncHandler(async (req, res) => {
+    await hardDeletePost(BigInt(String(req.params.id)))
+    res.status(204).end()
   }),
 )
 

@@ -9,6 +9,7 @@ vi.mock('../../src/api/client', () => ({
     getPost: vi.fn(),
     approve: vi.fn(),
     classify: vi.fn(),
+    hardDelete: vi.fn(),
   },
   ApiError: class extends Error {},
 }))
@@ -43,6 +44,37 @@ describe('posts store', () => {
     await store.loadPost('5')
     await store.approveCurrent()
     expect(store.current?.status).toBe('ready_to_publish')
+  })
+
+  it('hardDelete зовёт api и убирает пост из списка', async () => {
+    ;(api.listPosts as any).mockResolvedValue({
+      items: [{ id: '1' }, { id: '2' }],
+      total: 2,
+      page: 1,
+      pageSize: 20,
+    })
+    ;(api.hardDelete as any).mockResolvedValue(undefined)
+    const store = usePostsStore()
+    await store.loadList()
+    await store.hardDelete('1')
+    expect(api.hardDelete).toHaveBeenCalledWith('1')
+    expect(store.list.items.map((p) => p.id)).toEqual(['2'])
+    expect(store.list.total).toBe(1)
+  })
+
+  it('hardDelete при ошибке api не трогает список', async () => {
+    ;(api.listPosts as any).mockResolvedValue({
+      items: [{ id: '1' }],
+      total: 1,
+      page: 1,
+      pageSize: 20,
+    })
+    ;(api.hardDelete as any).mockRejectedValue(new Error('boom'))
+    const store = usePostsStore()
+    await store.loadList()
+    await expect(store.hardDelete('1')).rejects.toThrow('boom')
+    expect(store.list.items).toHaveLength(1)
+    expect(store.list.total).toBe(1)
   })
 
   it('classifyCurrent зовёт api.classify с id текущего поста', async () => {

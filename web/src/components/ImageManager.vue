@@ -47,11 +47,11 @@ function add() {
         placeholder="URL картинки"
         class="flex-1 rounded border border-surface-700 bg-surface-900 px-2 py-1 text-sm text-surface-0"
       />
-      <button data-test="img-add" class="rounded border border-surface-700 px-3 py-1 text-sm hover:bg-surface-800" @click="add">Добавить</button>
+      <button data-test="img-add" class="rounded px-3 py-1 text-sm hover:bg-surface-800" @click="add">Добавить</button>
       <button
         v-if="images.some((i) => i.chosen)"
         data-test="clear"
-        class="rounded border border-surface-700 px-3 py-1 text-sm hover:bg-surface-800"
+        class="rounded px-3 py-1 text-sm hover:bg-surface-800"
         @click="emit('select', null)"
       >
         Убрать картинку

@@ -19,7 +19,7 @@ async function logout() {
       <button
         v-if="auth.authenticated && auth.authRequired"
         data-test="logout"
-        class="rounded border border-surface-700 px-3 py-1 text-sm hover:bg-surface-800"
+        class="rounded px-3 py-1 text-sm hover:bg-surface-800"
         @click="logout"
       >
         выйти ({{ auth.login }})

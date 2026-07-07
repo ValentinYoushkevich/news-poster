@@ -74,6 +74,7 @@ export const api = {
   unapprove: (id: string) => request<Post>(`/posts/${id}/unapprove`, { method: 'POST' }),
   remove: (id: string, rejectReason?: string) =>
     request<Post>(`/posts/${id}`, { method: 'DELETE', body: JSON.stringify({ rejectReason }) }),
+  hardDelete: (id: string) => request<void>(`/posts/${id}/hard`, { method: 'DELETE' }),
   rewrite: (id: string) =>
     request<{ accepted: boolean }>(`/posts/${id}/rewrite`, { method: 'POST' }),
   classify: (id: string) =>

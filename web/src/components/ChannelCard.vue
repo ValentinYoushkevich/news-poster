@@ -17,7 +17,7 @@ const emit = defineEmits<{ open: [string]; edit: [Channel]; 'toggle-active': [st
         <button
           :data-test="`channel-edit-${props.channel.id}`"
           type="button"
-          class="rounded border border-surface-700 px-2 py-0.5 text-xs text-surface-300 hover:bg-surface-700"
+          class="rounded px-2 py-0.5 text-xs text-surface-300 hover:bg-surface-700"
           title="Редактировать канал"
           @click.stop="emit('edit', props.channel)"
         >

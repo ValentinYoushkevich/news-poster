@@ -140,7 +140,7 @@ function submit() {
         <button
           type="button"
           :data-test="`bucket-remove-${i}`"
-          class="rounded border border-surface-700 px-2 py-1 text-sm text-red-400 hover:bg-surface-800"
+          class="rounded px-2 py-1 text-sm text-red-400 hover:bg-surface-800"
           @click="removeBucket(i)"
         >
           удалить
@@ -149,7 +149,7 @@ function submit() {
       <button
         type="button"
         data-test="add-bucket"
-        class="self-start rounded border border-surface-700 px-3 py-1 text-sm hover:bg-surface-800"
+        class="self-start rounded px-3 py-1 text-sm hover:bg-surface-800"
         @click="addBucket"
       >
         + бакет
@@ -192,7 +192,7 @@ function submit() {
         v-if="isEdit"
         type="button"
         data-test="channel-cancel"
-        class="self-start rounded border border-surface-700 px-4 py-2 hover:bg-surface-800"
+        class="self-start rounded px-4 py-2 hover:bg-surface-800"
         @click="emit('cancel')"
       >
         Отмена

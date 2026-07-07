@@ -78,6 +78,15 @@ describe('api client', () => {
     expect((init as RequestInit).method).toBe('POST')
   })
 
+  it('hardDelete шлёт DELETE на /api/posts/:id/hard', async () => {
+    const fn = vi.fn(async (..._args: any[]) => ({ ok: true, status: 204, json: async () => ({}) }))
+    vi.stubGlobal('fetch', fn)
+    await expect(api.hardDelete('42')).resolves.toBeUndefined()
+    const [url, init] = fn.mock.calls[0]
+    expect(url).toContain('/api/posts/42/hard')
+    expect((init as RequestInit).method).toBe('DELETE')
+  })
+
   it('не-ok ответ бросает ApiError с code', async () => {
     mockFetch({ error: 'invalid_transition', code: 'invalid_transition' }, false, 409)
     await expect(api.approve('1')).rejects.toMatchObject({
