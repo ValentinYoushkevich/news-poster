@@ -26,4 +26,24 @@ describe('ChannelCard', () => {
     await w.get('[data-test="channel-card-c1"]').trigger('click')
     expect(w.emitted('open')?.[0]).toEqual(['c1'])
   })
+
+  it('кнопка редактирования эмитит edit и не эмитит open', async () => {
+    const w = mount(ChannelCard, { props: { channel } })
+    await w.get('[data-test="channel-edit-c1"]').trigger('click')
+    expect(w.emitted('edit')?.[0]).toEqual([channel])
+    expect(w.emitted('open')).toBeFalsy()
+  })
+
+  it('тумблер эмитит toggle-active с инверсией и не эмитит open', async () => {
+    const w = mount(ChannelCard, { props: { channel } })
+    await w.get('[data-test="channel-toggle-c1"]').trigger('click')
+    expect(w.emitted('toggle-active')?.[0]).toEqual(['c1', false])
+    expect(w.emitted('open')).toBeFalsy()
+  })
+
+  it('тумблер выключенного канала эмитит включение', async () => {
+    const w = mount(ChannelCard, { props: { channel: { ...channel, active: false } } })
+    await w.get('[data-test="channel-toggle-c1"]').trigger('click')
+    expect(w.emitted('toggle-active')?.[0]).toEqual(['c1', true])
+  })
 })

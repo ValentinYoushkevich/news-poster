@@ -34,21 +34,30 @@ services:
       PREVIEW_TTL_DEFAULT: ${PREVIEW_TTL_DEFAULT:-1440}
       DEDUP_THRESHOLD: ${DEDUP_THRESHOLD:-0.85}
       DEDUP_WINDOW_HOURS: ${DEDUP_WINDOW_HOURS:-24}
+      # Креды страницы логина админки (сессии выдаёт бэкенд, /auth/*). Значения — в корневом .env.
+      ADMIN_LOGIN: ${ADMIN_LOGIN}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      # Флаг Secure у сессионной куки; включать, когда админка за HTTPS.
+      ADMIN_COOKIE_SECURE: ${ADMIN_COOKIE_SECURE:-false}
     depends_on:
       db:
         condition: service_healthy
     # Порт наружу НЕ публикуем: API доступен с хоста только через админку (nginx /api, под логином),
     # а для n8n — по внутренней сети как http://backend:3000. Так админ-логин реально защищает API.
+    # В node:22-slim нет curl/wget — проверяем /health через node fetch.
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s # миграции prisma при старте занимают время
     restart: unless-stopped
 
   web:
     build: ./web
     depends_on:
-      - backend
-    environment:
-      # Логин/пароль админки (Basic Auth в nginx). Значения — в корневом .env.
-      ADMIN_LOGIN: ${ADMIN_LOGIN}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      backend:
+        condition: service_healthy
     ports:
       # host 8081 (:8080 занят astro-poster-web); контейнер слушает 80
       - "8081:80"
@@ -81,5 +90,12 @@ services:
 
 volumes:
   pgdata:
-  n8n_data: # -> n8n-stack_n8n_data (существующий, данные n8n сохраняются)
-  ollama_data: # -> n8n-stack_ollama_data (существующий, модели сохраняются)
+  # n8n_data/ollama_data — external с явными именами: compose этими томами НЕ владеет,
+  # поэтому `docker compose down -v` их не удалит. Подхватываются ТЕ ЖЕ существующие тома,
+  # данные n8n и модели ollama сохраняются.
+  n8n_data:
+    external: true
+    name: n8n-stack_n8n_data
+  ollama_data:
+    external: true
+    name: n8n-stack_ollama_data

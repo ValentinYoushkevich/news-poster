@@ -14,7 +14,13 @@ export interface SendMessageInput {
   text: string
 }
 
+export interface DeleteMessageInput {
+  chatId: string
+  messageId: number
+}
+
 export interface TelegramClient {
   sendPhoto(input: SendPhotoInput): Promise<TelegramSendResult>
   sendMessage(input: SendMessageInput): Promise<TelegramSendResult>
+  deleteMessage(input: DeleteMessageInput): Promise<void>
 }

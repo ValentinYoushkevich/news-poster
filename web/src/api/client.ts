@@ -1,4 +1,4 @@
-import type { Channel, ChannelCreate, ListFilters, Post, PostList } from './types'
+import type { Channel, ChannelCreate, ChannelUpdate, ListFilters, Post, PostList } from './types'
 
 const BASE = '/api'
 
@@ -10,6 +10,14 @@ export class ApiError extends Error {
   ) {
     super(message)
   }
+}
+
+// Колбэк на протухшую сессию: 401 на любом пути, кроме /auth/* (там 401 —
+// штатный ответ на неверные креды/отсутствие сессии, а не «сессия истекла»).
+let onUnauthorized: (() => void) | null = null
+
+export function setOnUnauthorized(cb: (() => void) | null): void {
+  onUnauthorized = cb
 }
 
 function qs(filters: ListFilters): string {
@@ -32,15 +40,28 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       /* ignore non-json body */
     }
+    if (res.status === 401 && !path.startsWith('/auth')) onUnauthorized?.()
     throw new ApiError(res.status, body.code, body.error ?? `http_${res.status}`)
   }
+  if (res.status === 204) return undefined as T
   return (await res.json()) as T
 }
 
+export interface AuthMe {
+  login: string | null
+  authRequired: boolean
+}
+
 export const api = {
+  login: (login: string, password: string) =>
+    request<AuthMe>('/auth/login', { method: 'POST', body: JSON.stringify({ login, password }) }),
+  logout: () => request<void>('/auth/logout', { method: 'POST' }),
+  me: () => request<AuthMe>('/auth/me'),
   listChannels: () => request<Channel[]>('/channels'),
   createChannel: (body: ChannelCreate) =>
     request<Channel>('/channels', { method: 'POST', body: JSON.stringify(body) }),
+  updateChannel: (id: string, body: ChannelUpdate) =>
+    request<Channel>(`/channels/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   listPosts: (f: ListFilters) => request<PostList>(`/posts?${qs(f)}`),
   getPost: (id: string) => request<Post>(`/posts/${id}`),
   patchPost: (id: string, body: { finalTitle?: string; finalText?: string; bucket?: string }) =>

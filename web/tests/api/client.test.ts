@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, api } from '../../src/api/client'
+import { ApiError, api, setOnUnauthorized } from '../../src/api/client'
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  setOnUnauthorized(null)
+})
 
 function mockFetch(body: unknown, ok = true, status = 200) {
   const fn = vi.fn(async (..._args: any[]) => ({ ok, status, json: async () => body }))
@@ -66,5 +69,31 @@ describe('api client', () => {
       code: 'invalid_transition',
     })
     await expect(api.approve('1')).rejects.toBeInstanceOf(ApiError)
+  })
+
+  it('updateChannel шлёт PATCH на /api/channels/:id с телом', async () => {
+    const fetchMock = mockFetch({ id: 'c1', active: false })
+    await api.updateChannel('c1', { active: false })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toContain('/api/channels/c1')
+    expect((init as RequestInit).method).toBe('PATCH')
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({ active: false })
+  })
+
+  it('401 вне /auth зовёт onUnauthorized и всё равно бросает ApiError', async () => {
+    mockFetch({ error: 'unauthorized', code: 'unauthorized' }, false, 401)
+    const cb = vi.fn()
+    setOnUnauthorized(cb)
+    await expect(api.listChannels()).rejects.toMatchObject({ status: 401 })
+    await expect(api.listChannels()).rejects.toBeInstanceOf(ApiError)
+    expect(cb).toHaveBeenCalled()
+  })
+
+  it('401 на /auth/* НЕ зовёт onUnauthorized', async () => {
+    mockFetch({ error: 'invalid_credentials', code: 'invalid_credentials' }, false, 401)
+    const cb = vi.fn()
+    setOnUnauthorized(cb)
+    await expect(api.login('admin', 'bad')).rejects.toMatchObject({ status: 401 })
+    expect(cb).not.toHaveBeenCalled()
   })
 })

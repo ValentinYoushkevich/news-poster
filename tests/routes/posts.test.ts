@@ -80,6 +80,33 @@ describe('GET /posts/:id', () => {
     expect(res.body.id).toBe(created.body.id)
   })
 
+  it('embedding не утекает в API, guid остаётся', async () => {
+    const ch = await makeChannel()
+    const post = await prisma.post.create({
+      data: {
+        channelId: ch.id,
+        source: 'rbc',
+        sourceLang: 'ru',
+        link: 'https://a/emb',
+        guid: 'guid-1',
+        origTitle: 'T',
+        origText: 'B',
+        categories: [],
+        pubDate: new Date('2026-07-07T10:00:00Z'),
+        images: [],
+        status: 'pending',
+        embedding: [0.1, 0.2, 0.3],
+      },
+    })
+    const res = await request(app).get(`/posts/${post.id}`)
+    expect(res.status).toBe(200)
+    expect(res.body).not.toHaveProperty('embedding')
+    expect(res.body.guid).toBe('guid-1')
+    // и в списке тоже
+    const list = await request(app).get(`/posts?channelId=${ch.id}`)
+    expect(list.body.items[0]).not.toHaveProperty('embedding')
+  })
+
   it('404 для несуществующего', async () => {
     const res = await request(app).get('/posts/999999')
     expect(res.status).toBe(404)

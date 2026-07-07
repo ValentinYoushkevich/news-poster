@@ -14,8 +14,11 @@ export async function ingest(item: RawItem) {
   const channel = await prisma.channel.findUnique({ where: { id: card.channelId } })
   if (!channel) throw new AppError(404, 'channel_not_found')
 
+  // Везде, где пост уходит наружу через API, embedding исключается (omit):
+  // это большой внутренний JSON дедупа, клиенту он не нужен и зря гоняется по сети.
   try {
     return await prisma.post.create({
+      omit: { embedding: true },
       data: {
         channelId: card.channelId,
         source: card.source,
@@ -63,6 +66,7 @@ export async function listPosts(filter: {
   const [items, total] = await Promise.all([
     prisma.post.findMany({
       where,
+      omit: { embedding: true },
       orderBy: { pubDate: 'desc' },
       skip: (filter.page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
@@ -73,7 +77,7 @@ export async function listPosts(filter: {
 }
 
 export async function getPost(id: bigint) {
-  const post = await prisma.post.findUnique({ where: { id } })
+  const post = await prisma.post.findUnique({ where: { id }, omit: { embedding: true } })
   if (!post) throw new AppError(404, 'post_not_found')
   return post
 }
@@ -83,7 +87,7 @@ export async function patchPost(
   data: Partial<{ finalTitle: string; finalText: string; bucket: string }>,
 ) {
   await getPost(id)
-  return prisma.post.update({ where: { id }, data })
+  return prisma.post.update({ where: { id }, data, omit: { embedding: true } })
 }
 
 export async function addImage(
@@ -104,6 +108,7 @@ export async function addImage(
   return prisma.post.update({
     where: { id },
     data: { images: next as unknown as Prisma.InputJsonValue },
+    omit: { embedding: true },
   })
 }
 
@@ -115,6 +120,7 @@ export async function selectImage(id: bigint, url: string | null) {
     return prisma.post.update({
       where: { id },
       data: { images: next as unknown as Prisma.InputJsonValue },
+      omit: { embedding: true },
     })
   }
   if (!images.some((i) => i.url === url)) throw new AppError(404, 'image_not_found')
@@ -122,6 +128,7 @@ export async function selectImage(id: bigint, url: string | null) {
   return prisma.post.update({
     where: { id },
     data: { images: next as unknown as Prisma.InputJsonValue },
+    omit: { embedding: true },
   })
 }
 
@@ -164,6 +171,7 @@ export async function approvePost(id: bigint, telegram: TelegramClient = default
       status: 'ready_to_publish',
       approvedAt: new Date(),
     },
+    omit: { embedding: true },
   })
 }
 
@@ -171,7 +179,7 @@ export async function unapprovePost(id: bigint) {
   const post = await getPost(id)
   assertTransition(post.status, 'pending') // требует ready_to_publish
   // Превью-сообщение в служебке НЕ удаляем — там TTL-автоудаление снаружи.
-  return prisma.post.update({ where: { id }, data: { status: 'pending' } })
+  return prisma.post.update({ where: { id }, data: { status: 'pending' }, omit: { embedding: true } })
 }
 
 export async function softDeletePost(id: bigint, rejectReason?: string) {
@@ -180,6 +188,7 @@ export async function softDeletePost(id: bigint, rejectReason?: string) {
   return prisma.post.update({
     where: { id },
     data: { status: 'rejected', rejectReason: rejectReason ?? null },
+    omit: { embedding: true },
   })
 }
 
@@ -202,7 +211,8 @@ export async function listPublishQueue(filter: {
   limit?: number
 }): Promise<QueueItem[]> {
   const posts = await prisma.post.findMany({
-    where: { channelId: filter.channelId, status: 'ready_to_publish' },
+    // channel.active=false — канал выключен оператором: его посты в публикацию не отдаём.
+    where: { channelId: filter.channelId, status: 'ready_to_publish', channel: { active: true } },
     orderBy: { pubDate: 'asc' },
     take: filter.limit ?? QUEUE_LIMIT_DEFAULT,
     include: { channel: true },
@@ -234,5 +244,6 @@ export async function markPublished(id: bigint, publishedMessageId: bigint) {
       publishedMessageId,
       publishedAt: new Date(),
     },
+    omit: { embedding: true },
   })
 }

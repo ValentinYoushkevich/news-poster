@@ -35,6 +35,9 @@
 
 - `BOT_TOKEN` — один бот на все каналы
 - `SERVICE_CHAT_ID` — общая служебка (превью + CDN картинок)
+- `ADMIN_LOGIN` / `ADMIN_PASSWORD` — креды входа в админку; если не заданы — аутентификация выключена (админка открыта)
+- `ADMIN_COOKIE_SECURE` — `true` включает secure-флаг сессионной куки (для работы за HTTPS)
+- `PREVIEW_TTL_DEFAULT` — глобальный дефолт TTL превью в служебке (минуты), если у канала не задан `previewTtl`
 
 ### 1.1. Таблица `channels`
 
@@ -53,6 +56,8 @@
 | `createdAt` `updatedAt` | DateTime | |
 
 Бакеты и промпты — **per-channel**: классификатор и рерайт берут список/шаблоны из конфига канала, а не из хардкода. Тех-канал в будущем получит свои бакеты, не трогая код.
+
+Оператор заводит и редактирует каналы **через UI админки на главной странице** (форма создания + карточки каналов с редактированием и тумблером `active`); под капотом это CRUD `/channels`.
 
 ### 1.2. Таблица `posts` (Prisma-модель):
 
@@ -87,7 +92,7 @@
 
 Индексы: `(channelId, link)` unique, `(channelId, status, pubDate)` — под очередь публикации, `(channelId, bucket)`, `pubDate`.
 
-**Картинки — почему массив.** Требование «оставить 1 из нескольких» + возможные источники с галереями. `chosen: true` помечает выбранную; `fileId` заполняется на аппруве (заливка в служебку). `origin` = `enclosure` | `content` | `uploaded` (загружена человеком вручную).
+**Картинки — почему массив.** Требование «оставить 1 из нескольких» + возможные источники с галереями. `chosen: true` помечает выбранную; `fileId` заполняется на аппруве (заливка в служебку). `origin` = `enclosure` | `content` | `uploaded` (добавлена человеком вручную по URL).
 
 ---
 
@@ -97,6 +102,10 @@
 ingested → processing → pending ⇄ ready_to_publish → published
                 ↓          ↓  ↘
               failed   rejected (удаление)
+
+дополнительно:
+processing       → rejected   (смысловой дубль, отброшен дедупом)
+ready_to_publish → rejected   (удаление уже заапрувленного, soft-delete)
 ```
 
 | Статус | Смысл |
@@ -109,7 +118,7 @@ ingested → processing → pending ⇄ ready_to_publish → published
 | `rejected` | удалён/отклонён |
 | `failed` | ИИ упал, нужен разбор |
 
-Переходы валидирует сервис. Ключевой цикл — `pending ⇄ ready_to_publish`: аппрув двигает вперёд, «отменить аппрув» возвращает назад.
+Переходы валидирует сервис. Ключевой цикл — `pending ⇄ ready_to_publish`: аппрув двигает вперёд, «отменить аппрув» возвращает назад. Помимо базовой диаграммы разрешены `processing → rejected` (ИИ-дедуп отбросил смысловой дубль) и `ready_to_publish → rejected` (удаление уже заапрувленного поста).
 
 ---
 
@@ -153,7 +162,7 @@ n8n шлёт `POST /posts` с сырым айтемом + `channelId`, `source`,
 ### 5.1. Просмотр карточки (`pending`)
 - видит текст + картинку по исходному URL (превью)
 - **правит текст** (`finalTitle`, `finalText`)
-- **если картинки нет / ссылка битая** → кнопка **«Добавить картинку»**: загрузка своего файла (`origin=uploaded`)
+- **если картинки нет / ссылка битая** → кнопка **«Добавить картинку»**: добавление своей картинки **по URL** (`origin=uploaded`); загрузки файла (multipart) нет
 - может **убрать картинку** → пост станет текстовым
 
 ### 5.2. Кнопка «Заапрувить» — генерация превью
@@ -183,14 +192,20 @@ n8n шлёт `POST /posts` с сырым айтемом + `channelId`, `source`,
 | `GET`/`POST`/`PATCH` | `/channels` | CRUD каналов (конфиг: mainChatId, бакеты, промпты, расписание) |
 | `GET` | `/posts/:id` | карточка |
 | `PATCH` | `/posts/:id` | правка `finalTitle/finalText/bucket` |
-| `POST` | `/posts/:id/images` | загрузить свою картинку (`origin=uploaded`) |
+| `POST` | `/posts/:id/images` | добавить свою картинку по URL — JSON `{url, type?}` (`origin=uploaded`) |
 | `PATCH` | `/posts/:id/images/select` | выбрать одну / убрать картинку |
 | `POST` | `/posts/:id/approve` | заапрувить: залить в служебку → `fileId` → `ready_to_publish` + превью |
 | `POST` | `/posts/:id/unapprove` | откат `ready_to_publish → pending` |
 | `DELETE`| `/posts/:id` | удалить (`rejected`, soft-delete) |
-| `POST` | `/posts/:id/rewrite` | пере-запустить рерайт (idempotent, async) |
-| `GET` | `/posts?status=ready_to_publish` | очередь для публикующей джобы |
+| `POST` | `/posts/:id/rewrite` | пере-запустить рерайт (idempotent, async; только из `pending`/`failed`) |
+| `GET` | `/posts/queue` | очередь для публикующей джобы: `?channelId=&limit=` → `[{id, channelId, pubDate, caption, fileId, mainChatId}]`, ASC по `pubDate`, только каналы с `active=true` |
 | `PATCH` | `/posts/:id/published` | джоба: `→ published` + `publishedMessageId` |
+| `POST` | `/auth/login` | вход в админку (креды из `ADMIN_LOGIN`/`ADMIN_PASSWORD`) → cookie-сессия `admin_session` |
+| `POST` | `/auth/logout` | выход, сброс сессии |
+| `GET` | `/auth/me` | информация о текущей сессии |
+| `GET` | `/auth/check` | проверка сессии для nginx `auth_request` (дёргается на каждый запрос к `/api/*`) |
+
+Роуты `/auth/*` обслуживают вход в админку (страница `/login`); сессия — httpOnly-cookie `admin_session` (SameSite=Lax, 7 дней, хранится в памяти бэкенда — рестарт разлогинивает). n8n аутентификацию не проходит: он ходит в бэкенд напрямую по docker-сети (`backend:3000`), минуя nginx.
 
 ---
 
@@ -198,8 +213,8 @@ n8n шлёт `POST /posts` с сырым айтемом + `channelId`, `source`,
 
 Отдельный воркфлоу по расписанию, **на каждый канал по своему расписанию** из `channels.schedule` (посты уходят в очередь, а не сразу):
 
-1. `GET /posts?channelId=X&status=ready_to_publish` (по одному, ORDER BY pubDate) — ровный тайминг
-2. Публикация в **основной канал этого канала** (`channels.mainChatId`) по сохранённому `fileId`:
+1. `GET /posts/queue?channelId=X&limit=1` — очередь готовых постов (ASC по `pubDate`, по одному — ровный тайминг; посты неактивных каналов в очередь не попадают). Каждый элемент уже содержит всё для постинга: `{id, channelId, pubDate, caption, fileId, mainChatId}` (caption — готовый HTML-экранированный текст)
+2. Публикация в **основной канал этого канала** (`mainChatId` из ответа очереди) по сохранённому `fileId`:
    - есть `fileId` → `sendPhoto` (caption ≤ 1024, `parse_mode=HTML`)
    - нет → `sendMessage` (≤ 4096)
 3. Фолбэк: `sendPhoto` упал → `sendMessage` без картинки (пост не теряется)
@@ -215,7 +230,7 @@ HTML-экранирование (`&`→`&amp;`, `<`→`&lt;`, `>`→`&gt;`) де
 - Роль: генерация превью + CDN картинок (`file_id`).
 - Заполняется на аппруве, отдаёт `file_id` и `message_id`.
 - Превью всех каналов идут вперемешку в одну служебку — приемлемо, т.к. это технический буфер, не рабочая выдача.
-- **Чистка — только TTL-автоудалением по сроку.** Вручную/по отмене аппрува не удаляем.
+- **Чистка — только TTL-автоудалением по сроку.** Вручную/по отмене аппрува не удаляем. Механика: фоновая джоба сервиса раз в 5 минут удаляет превью-сообщения спустя `channels.previewTtl` минут (или `PREVIEW_TTL_DEFAULT`, дефолт 1440) после аппрува.
 
 ---
 

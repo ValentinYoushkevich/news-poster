@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { triggerAiProcessing, triggerRewrite } from '../ai/trigger.js'
-import { asyncHandler } from '../errors.js'
+import { AppError, asyncHandler } from '../errors.js'
 import {
   addImage,
   approvePost,
@@ -157,7 +157,13 @@ postsRouter.post(
   '/:id/rewrite',
   asyncHandler(async (req, res) => {
     const id = BigInt(String(req.params.id)) // Express 5: params.id имеет тип string | string[]
-    await getPost(id) // 404, если нет
+    const post = await getPost(id) // 404, если нет
+    // Пере-рерайт разрешён только из pending/failed (см. карту src/status.ts):
+    // rejected нельзя «воскрешать», published — рассинхрон с уже опубликованным.
+    // Проверяем до постановки в очередь; воркер повторит переход атомарно.
+    if (post.status !== 'pending' && post.status !== 'failed') {
+      throw new AppError(409, 'invalid_transition')
+    }
     void triggerRewrite(id)
     res.status(202).json({ accepted: true })
   }),

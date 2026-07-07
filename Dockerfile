@@ -15,13 +15,20 @@ RUN npm run build
 FROM node:22-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
-# openssl нужен движку Prisma на debian-slim
+# openssl нужен движку Prisma на debian-slim (и для prisma generate ниже)
 RUN apt-get update && apt-get install -y --no-install-recommends openssl \
   && rm -rf /var/lib/apt/lists/*
 COPY package*.json ./
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/dist ./dist
+# Ставим ТОЛЬКО production-зависимости — devDependencies (typescript, ts-node и пр.)
+# в runtime-образ не попадают. prisma CLI лежит в dependencies: он нужен
+# для `npx prisma migrate deploy` в CMD.
+RUN npm ci --omit=dev
 COPY --from=build /app/prisma ./prisma
+# После чистого `npm ci` сгенерированного Prisma-клиента нет — генерируем заново
+# по схеме (вариант с generate выбран вместо COPY из build: клиент гарантированно
+# соответствует установленным prod-зависимостям).
+RUN npx prisma generate
+COPY --from=build /app/dist ./dist
 EXPOSE 3000
 # накатываем миграции и стартуем сервер
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]

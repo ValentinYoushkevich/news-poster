@@ -83,7 +83,9 @@ export function normalizeItem(item: RawItem): NormalizedCard {
     origText: cutReadMoreTail(stripHtml(item.contentSnippet)),
     author: item.creator ?? item.author ?? item['dc:creator'] ?? null,
     categories: normalizeCategories(item.categories),
-    pubDate: item.isoDate ? new Date(item.isoDate) : new Date(0),
+    // Без isoDate берём момент инжеста, а не epoch: очередь публикации
+    // сортируется по pubDate ASC, и пост «из 1970» вставал бы первым.
+    pubDate: item.isoDate ? new Date(item.isoDate) : new Date(),
     images: normalizeImages(item),
   }
 }

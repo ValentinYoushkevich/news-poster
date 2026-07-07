@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { processPost } from '../../src/ai/worker.js'
+import { processPost, reRewritePost } from '../../src/ai/worker.js'
 import type { RewriteInput, WorkerDeps } from '../../src/ai/providers/types.js'
 import { prisma } from '../../src/db/client.js'
 import { makeChannel, resetDb } from '../helpers/db.js'
@@ -103,5 +103,84 @@ describe('processPost — ошибка', () => {
     await processPost(post.id, fakeDeps({ bucket: 'спорт' }))
     const updated = await prisma.post.findUniqueOrThrow({ where: { id: post.id } })
     expect(updated.status).toBe('failed')
+  })
+})
+
+describe('processPost — гонки со сменой статуса', () => {
+  it('оператор reject-нул карточку во время рерайта — воркер не перетирает статус', async () => {
+    const ch = await makeChannel()
+    const post = await makePost(ch.id)
+    const deps: WorkerDeps = {
+      embedding: { embed: async () => [1, 0, 0] },
+      llm: {
+        classify: async () => 'рф-внутр',
+        rewrite: async () => {
+          // конкурентный soft-delete, пока воркер ждал LLM
+          await prisma.post.update({
+            where: { id: post.id },
+            data: { status: 'rejected', rejectReason: 'оператор' },
+          })
+          return { title: 'РТ', text: 'РТело' }
+        },
+      },
+    }
+    await processPost(post.id, deps)
+    const updated = await prisma.post.findUniqueOrThrow({ where: { id: post.id } })
+    // финальный переход processing->pending не прошёл: статус и rewrite-поля целы
+    expect(updated.status).toBe('rejected')
+    expect(updated.rejectReason).toBe('оператор')
+    expect(updated.rewrittenTitle).toBeNull()
+    expect(updated.finalText).toBeNull()
+  })
+
+  it('статус сменился между чтением и стартом — воркер выходит, ничего не трогая', async () => {
+    const ch = await makeChannel()
+    const post = await makePost(ch.id, { status: 'rejected', rejectReason: 'до старта' })
+    await processPost(post.id, fakeDeps())
+    const updated = await prisma.post.findUniqueOrThrow({ where: { id: post.id } })
+    expect(updated.status).toBe('rejected')
+    expect(updated.embedding).toBeNull()
+  })
+})
+
+describe('reRewritePost — гонки со сменой статуса', () => {
+  it('карточка reject-нута во время рерайта — статус не перетирается', async () => {
+    const ch = await makeChannel()
+    const post = await makePost(ch.id, { status: 'pending', bucket: 'рф-внутр' })
+    const deps: WorkerDeps = {
+      embedding: { embed: async () => [1, 0, 0] },
+      llm: {
+        classify: async () => 'рф-внутр',
+        rewrite: async () => {
+          await prisma.post.update({
+            where: { id: post.id },
+            data: { status: 'rejected', rejectReason: 'оператор' },
+          })
+          return { title: 'РТ', text: 'РТело' }
+        },
+      },
+    }
+    await reRewritePost(post.id, deps)
+    const updated = await prisma.post.findUniqueOrThrow({ where: { id: post.id } })
+    expect(updated.status).toBe('rejected')
+    expect(updated.rewrittenTitle).toBeNull()
+  })
+
+  it('rejected к моменту старта — не «воскрешается» в processing/pending', async () => {
+    const ch = await makeChannel()
+    const post = await makePost(ch.id, { status: 'rejected', bucket: 'рф-внутр' })
+    await reRewritePost(post.id, fakeDeps())
+    const updated = await prisma.post.findUniqueOrThrow({ where: { id: post.id } })
+    expect(updated.status).toBe('rejected')
+  })
+
+  it('failed -> pending (штатный повторный запуск)', async () => {
+    const ch = await makeChannel()
+    const post = await makePost(ch.id, { status: 'failed', aiError: 'boom', bucket: 'рф-внутр' })
+    await reRewritePost(post.id, fakeDeps())
+    const updated = await prisma.post.findUniqueOrThrow({ where: { id: post.id } })
+    expect(updated.status).toBe('pending')
+    expect(updated.aiError).toBeNull()
+    expect(updated.finalTitle).toBe('РТ')
   })
 })

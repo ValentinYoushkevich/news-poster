@@ -1,4 +1,5 @@
 import type {
+  DeleteMessageInput,
   SendMessageInput,
   SendPhotoInput,
   TelegramClient,
@@ -66,6 +67,15 @@ export function createTelegramClient(cfg: { botToken: string }): TelegramClient 
         parse_mode: 'HTML',
       })
       return { messageId: result.message_id }
+    },
+    // Bot API отдаёт result: true (boolean) — truthy-проверка в call проходит.
+    // При ошибке бросает Error с description телеграма; previewCleanup разбирает
+    // по нему кейс «message to delete not found».
+    async deleteMessage(input: DeleteMessageInput): Promise<void> {
+      await call('deleteMessage', {
+        chat_id: input.chatId,
+        message_id: input.messageId,
+      })
     },
   }
 }

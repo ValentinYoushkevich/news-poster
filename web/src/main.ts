@@ -6,7 +6,9 @@ import PrimeVue from 'primevue/config'
 import ToastService from 'primevue/toastservice'
 import { createApp } from 'vue'
 import App from './App.vue'
+import { setOnUnauthorized } from './api/client.js'
 import router from './router/index.js'
+import { useAuthStore } from './stores/auth.js'
 import './style.css'
 
 const IndigoDark = definePreset(Aura, {
@@ -32,6 +34,12 @@ document.documentElement.classList.add('app-dark')
 const app = createApp(App)
 app.use(createPinia())
 app.use(router)
+
+// Протухшая сессия: 401 вне /auth/* сбрасывает auth-стор и уводит на /login.
+setOnUnauthorized(() => {
+  useAuthStore().reset()
+  router.push({ name: 'login' })
+})
 app.use(PrimeVue, {
   theme: { preset: IndigoDark, options: { darkModeSelector: '.app-dark', cssLayer: false } },
 })

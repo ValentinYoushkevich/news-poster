@@ -73,4 +73,51 @@ describe('ChannelPostsView', () => {
     await w.get('[data-test="row-1"]').trigger('click')
     expect(push).toHaveBeenCalledWith('/posts/1')
   })
+
+  it('при входе сбрасывает фильтры другого канала к дефолту', async () => {
+    const posts = usePostsStore()
+    posts.filters.channelId = 'c0'
+    posts.filters.status = 'published'
+    posts.filters.bucket = 'старый'
+    posts.filters.source = 'rbc'
+    posts.filters.date = '2026-01-01'
+    posts.filters.page = 5
+
+    mount(ChannelPostsView, { props: { channelId: 'c1' } })
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(posts.filters).toMatchObject({
+      channelId: 'c1',
+      status: undefined,
+      bucket: undefined,
+      source: undefined,
+      date: undefined,
+      page: 1,
+    })
+    expect(api.listPosts).toHaveBeenLastCalledWith(
+      expect.objectContaining({ channelId: 'c1', page: 1 }),
+    )
+  })
+
+  it('переход канал→канал (смена пропа) тоже сбрасывает фильтры', async () => {
+    const w = mount(ChannelPostsView, { props: { channelId: 'c1' } })
+    await new Promise((r) => setTimeout(r, 0))
+    const posts = usePostsStore()
+    posts.filters.status = 'pending'
+    posts.filters.bucket = 'сво'
+    posts.filters.page = 3
+
+    await w.setProps({ channelId: 'c2' })
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(posts.filters).toMatchObject({
+      channelId: 'c2',
+      status: undefined,
+      bucket: undefined,
+      page: 1,
+    })
+    expect(api.listPosts).toHaveBeenLastCalledWith(
+      expect.objectContaining({ channelId: 'c2', page: 1 }),
+    )
+  })
 })

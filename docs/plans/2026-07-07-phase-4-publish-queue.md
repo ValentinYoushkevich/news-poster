@@ -1,3 +1,5 @@
+> ⚠️ **Исторический документ: план выполнен.** Отдельные детали устарели (создание каналов теперь через UI админки, порт 3000 наружу не публикуется, добавлена аутентификация `/login`). Актуальное описание системы — [docs/устройство системы.md](../устройство%20системы.md).
+
 # Фаза 4 — Очередь публикации — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

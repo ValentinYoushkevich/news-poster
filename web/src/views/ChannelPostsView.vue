@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import PostFilters from '../components/PostFilters.vue'
 import PostTable from '../components/PostTable.vue'
@@ -11,16 +11,32 @@ const router = useRouter()
 const posts = usePostsStore()
 const channelsStore = useChannelsStore()
 
-const channelName = computed(
-  () => channelsStore.channels.find((c) => c.id === props.channelId)?.name ?? props.channelId,
-)
+const channel = computed(() => channelsStore.channels.find((c) => c.id === props.channelId))
+const channelName = computed(() => channel.value?.name ?? props.channelId)
+const buckets = computed(() => channel.value?.buckets ?? [])
+
+// Полный сброс фильтров к дефолту: чужие status/bucket/source/date не должны
+// протекать между каналами.
+async function resetForChannel(channelId: string) {
+  posts.filters.channelId = channelId
+  posts.filters.status = undefined
+  posts.filters.bucket = undefined
+  posts.filters.source = undefined
+  posts.filters.date = undefined
+  posts.filters.page = 1
+  await posts.loadList()
+}
 
 onMounted(async () => {
   if (!channelsStore.channels.length) await channelsStore.loadChannels()
-  posts.filters.channelId = props.channelId
-  posts.filters.page = 1
-  await posts.loadList()
+  await resetForChannel(props.channelId)
 })
+
+// Переход канал→канал переиспользует компонент — сбрасываем и по смене пропа.
+watch(
+  () => props.channelId,
+  (id) => resetForChannel(id),
+)
 
 function open(id: string) {
   router.push(`/posts/${id}`)
@@ -39,12 +55,7 @@ function changePage(page: number) {
       <h2 class="text-lg font-semibold">{{ channelName }}</h2>
     </div>
 
-    <PostFilters
-      v-model="posts.filters"
-      :channels="channelsStore.channels"
-      hide-channel
-      @apply="posts.loadList()"
-    />
+    <PostFilters v-model="posts.filters" :buckets="buckets" @apply="posts.loadList()" />
 
     <div class="rounded border border-surface-700">
       <PostTable :posts="posts.list.items" @open="open" />

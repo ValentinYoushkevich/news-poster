@@ -45,6 +45,16 @@ describe('normalizeItem', () => {
     expect(r.pubDate.toISOString()).toBe('2026-07-07T10:00:00.000Z')
   })
 
+  it('pubDate без isoDate — момент инжеста, а не epoch (иначе пост первым в очереди)', () => {
+    const before = Date.now()
+    const { isoDate: _skip, ...noDate } = base
+    const r = normalizeItem(noDate)
+    const after = Date.now()
+    expect(r.pubDate).toBeInstanceOf(Date)
+    expect(r.pubDate.getTime()).toBeGreaterThanOrEqual(before)
+    expect(r.pubDate.getTime()).toBeLessThanOrEqual(after)
+  })
+
   it('images: enclosure.url -> один кандидат (length игнорируем)', () => {
     const item = {
       ...base,

@@ -84,6 +84,14 @@ describe('GET /posts/queue', () => {
     expect(res.body[0].fileId).toBeNull()
   })
 
+  it('выключенный канал (active=false) не отдаёт посты в очередь', async () => {
+    const ch = await makeChannel({ active: false })
+    await seedPost(ch.id, { link: 'https://a/off' })
+    const res = await request(app).get(`/posts/queue?channelId=${ch.id}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual([])
+  })
+
   it('limit ограничивает выдачу', async () => {
     const ch = await makeChannel()
     await seedPost(ch.id, { link: 'https://a/1' })

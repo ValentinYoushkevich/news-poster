@@ -20,6 +20,40 @@ describe('ApprovalActions', () => {
     expect(c.find('[data-test="approve"]').exists()).toBe(false)
   })
 
+  it('pending: доступны и rewrite, и delete', () => {
+    const c = w('pending')
+    expect(c.find('[data-test="rewrite"]').exists()).toBe(true)
+    expect(c.find('[data-test="delete"]').exists()).toBe(true)
+  })
+
+  it('failed: доступен rewrite, но не delete', () => {
+    const c = w('failed')
+    expect(c.find('[data-test="rewrite"]').exists()).toBe(true)
+    expect(c.find('[data-test="delete"]').exists()).toBe(false)
+  })
+
+  it('ready_to_publish: доступен delete, но не rewrite', () => {
+    const c = w('ready_to_publish')
+    expect(c.find('[data-test="delete"]').exists()).toBe(true)
+    expect(c.find('[data-test="rewrite"]').exists()).toBe(false)
+  })
+
+  it('processing: доступен delete, но не rewrite', () => {
+    const c = w('processing')
+    expect(c.find('[data-test="delete"]').exists()).toBe(true)
+    expect(c.find('[data-test="rewrite"]').exists()).toBe(false)
+  })
+
+  it('published: кнопок нет', () => {
+    const c = w('published')
+    expect(c.findAll('button')).toHaveLength(0)
+  })
+
+  it('rejected: кнопок нет', () => {
+    const c = w('rejected')
+    expect(c.findAll('button')).toHaveLength(0)
+  })
+
   it('эмитит события кнопок', async () => {
     const c = w('pending')
     await c.get('[data-test="approve"]').trigger('click')

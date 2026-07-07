@@ -23,6 +23,7 @@ export interface Post {
   source: string
   sourceLang: string
   link: string
+  guid: string | null
   origTitle: string
   origText: string
   author: string | null
@@ -65,6 +66,17 @@ export interface ChannelCreate {
   rewritePrompts: Record<string, string>
   schedule: string
   previewTtl?: number | null
+}
+
+// PATCH /channels/:id — все поля опциональны (updateSchema = createSchema.partial()).
+export interface ChannelUpdate {
+  name?: string
+  mainChatId?: string
+  buckets?: string[]
+  rewritePrompts?: Record<string, string>
+  schedule?: string
+  previewTtl?: number | null
+  active?: boolean
 }
 
 export interface PostList {

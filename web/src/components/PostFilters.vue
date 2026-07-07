@@ -1,11 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { Channel, ListFilters } from '../api/types'
+import type { ListFilters } from '../api/types'
 
-const props = withDefaults(
-  defineProps<{ modelValue: ListFilters; channels: Channel[]; hideChannel?: boolean }>(),
-  { hideChannel: false },
-)
+// buckets — рубрики текущего канала (фильтры всегда показываются внутри канала).
+const props = defineProps<{ modelValue: ListFilters; buckets: string[] }>()
 const emit = defineEmits<{
   'update:modelValue': [ListFilters]
   apply: []
@@ -21,11 +18,6 @@ const STATUSES = [
   'failed',
 ]
 
-const buckets = computed(() => {
-  const ch = props.channels.find((c) => c.id === props.modelValue.channelId)
-  return ch?.buckets ?? []
-})
-
 function patch(part: Partial<ListFilters>) {
   emit('update:modelValue', { ...props.modelValue, ...part, page: 1 })
 }
@@ -33,19 +25,6 @@ function patch(part: Partial<ListFilters>) {
 
 <template>
   <div class="flex flex-wrap items-end gap-3 rounded border border-surface-700 bg-surface-900 p-3">
-    <label v-if="!props.hideChannel" class="flex flex-col text-sm">
-      <span>Канал</span>
-      <select
-        data-test="channel"
-        class="rounded border border-surface-700 bg-surface-900 px-2 py-1 text-surface-0"
-        :value="modelValue.channelId ?? ''"
-        @change="patch({ channelId: ($event.target as HTMLSelectElement).value || undefined, bucket: undefined })"
-      >
-        <option value="">— все —</option>
-        <option v-for="c in channels" :key="c.id" :value="c.id">{{ c.name }}</option>
-      </select>
-    </label>
-
     <label class="flex flex-col text-sm">
       <span>Статус</span>
       <select
